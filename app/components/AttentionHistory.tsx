@@ -44,7 +44,7 @@ interface AttentionHistoryProps {
  * Follows pattern from InboxActivity.tsx (SWR fetch, loading skeleton).
  */
 const DEFAULT_LIMIT = 20;
-const REFRESH_INTERVAL = 30000; // 30 seconds
+const REFRESH_INTERVAL = 300000; // 5 minutes
 
 export default function AttentionHistory({
   btcAddress,
