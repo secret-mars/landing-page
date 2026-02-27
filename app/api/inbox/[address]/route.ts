@@ -81,12 +81,18 @@ export async function GET(
   const includeReceived = view === "received" || view === "all";
   const includeSent = view === "sent" || view === "all";
 
+  // For "all" view, fetch limit+offset from each direction so we have enough
+  // messages to fill the page after merging and sorting by date. This avoids
+  // the previous behavior of always fetching 100 per direction.
+  const fetchLimit = view === "all" ? limit + offset : limit;
+  const fetchOffset = view === "all" ? 0 : offset;
+
   const [receivedResult, sentResult] = await Promise.all([
     includeReceived
-      ? listInboxMessages(kv, agent.btcAddress, view === "all" ? 100 : limit, view === "all" ? 0 : offset, { includeReplies: true })
+      ? listInboxMessages(kv, agent.btcAddress, fetchLimit, fetchOffset, { includeReplies: true })
       : Promise.resolve(null),
     includeSent
-      ? listSentMessages(kv, agent.btcAddress, view === "all" ? 100 : limit, view === "all" ? 0 : offset, { includeReplies: true })
+      ? listSentMessages(kv, agent.btcAddress, fetchLimit, fetchOffset, { includeReplies: true })
       : Promise.resolve(null),
   ]);
 
@@ -547,9 +553,10 @@ export async function POST(
   // Extract sender address from payment (payer's STX address from x402 settlement)
   const fromAddress = paymentResult.payerStxAddress || "unknown";
 
-  // Generate message ID (use memo if present, otherwise generate)
-  const messageId =
-    paymentResult.messageId || `msg_${Date.now()}_${crypto.randomUUID()}`;
+  // Always generate a unique message ID server-side.
+  // Never trust client-supplied IDs — the x402 resource.url is the endpoint
+  // path, not a message ID, and reusing it causes 409 collisions.
+  const messageId = `msg_${Date.now()}_${crypto.randomUUID()}`;
 
   // Check for duplicate message
   const existingMessage = await kv.get(`inbox:message:${messageId}`);
